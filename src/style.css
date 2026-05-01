@@ -7,32 +7,33 @@ body {
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
-  touch-action: none; /* prevent scroll/zoom on touch */
+  touch-action: none;
   -webkit-tap-highlight-color: transparent;
 }
 
 #app {
   width: 100vw;
   height: 100vh;
-  height: 100dvh; /* dynamic viewport height — accounts for mobile browser chrome */
+  height: 100dvh;
   position: relative;
 }
 
 /* ── HUD ─────────────────────────────────────────────────────────────────── */
 #hud {
   position: absolute;
-  top: 10px;
+  top: max(10px, env(safe-area-inset-top, 10px));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 10px;
   z-index: 10;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0,0,0,0.65);
   padding: 6px 16px;
   border-radius: 30px;
-  border: 1px solid rgba(255,255,255,0.1);
-  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.12);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   white-space: nowrap;
   max-width: calc(100vw - 24px);
 }
@@ -45,7 +46,7 @@ body {
 }
 
 #xp-bar-wrap {
-  width: 100px;
+  width: 120px;
   height: 8px;
   background: rgba(255,255,255,0.1);
   border-radius: 4px;
@@ -66,7 +67,7 @@ body {
 #xp-label-wrap {
   font-size: 0.65rem;
   color: #aaa;
-  min-width: 90px;
+  min-width: 100px;
   text-align: center;
 }
 
@@ -83,9 +84,9 @@ body {
   width: 100%; height: 100%;
   cursor: none;
   touch-action: none;
+  display: block;
 }
 
-/* On touch devices show default cursor (no mouse cursor to hide) */
 @media (hover: none) {
   #game-canvas { cursor: default; }
 }
@@ -119,7 +120,7 @@ body {
 /* ── Level-up toast ──────────────────────────────────────────────────────── */
 #achievement-toast {
   position: absolute;
-  top: 60px;
+  top: 64px;
   left: 50%;
   transform: translateX(-50%);
   background: linear-gradient(135deg, #7c3aed, #a78bfa);
@@ -144,11 +145,13 @@ body {
 #controls {
   position: absolute;
   bottom: 0; left: 0; right: 0;
-  background: rgba(0,0,0,0.82);
+  background: rgba(0,0,0,0.85);
   border-top: 1px solid rgba(255,255,255,0.1);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   z-index: 10;
-  padding: 0;
+  /* Safe area for iPhone home bar */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 #controls-row1 {
@@ -156,24 +159,40 @@ body {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  flex-wrap: nowrap;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
 #controls-row1::-webkit-scrollbar { display: none; }
 
+/* Desktop: show theme buttons inline, no toggle needed */
 #theme-selector {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px 8px;
+  padding: 0 12px 8px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  border-top: 1px solid rgba(255,255,255,0.06);
+  flex-wrap: nowrap;
 }
 #theme-selector::-webkit-scrollbar { display: none; }
+
+/* Mobile: theme selector is collapsible */
+@media (max-width: 640px) {
+  #theme-selector {
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding: 6px 12px 8px;
+  }
+  #theme-selector.hidden { display: none !important; }
+  #theme-toggle-btn { display: flex; }
+}
+
+/* Hide toggle on desktop */
+@media (min-width: 641px) {
+  #theme-toggle-btn { display: none; }
+  #theme-selector { display: flex !important; }
+}
 
 button {
   padding: 8px 14px;
@@ -185,31 +204,27 @@ button {
   transition: all 0.15s ease;
   white-space: nowrap;
   flex-shrink: 0;
-  /* Larger tap targets on mobile */
-  min-height: 36px;
+  min-height: 38px;
+  -webkit-appearance: none;
 }
 
-#upload-btn {
-  background: #6c5ce7;
-  color: white;
-  padding: 8px 12px;
-  font-size: 1rem;
-}
-#upload-btn:active { background: #7d6ff0; transform: scale(0.95); }
-
+#upload-btn { background: #6c5ce7; color: white; padding: 8px 12px; font-size: 1rem; }
 #rename-btn { background: #00b894; color: white; }
-#rename-btn:active { background: #00cba9; transform: scale(0.95); }
+#reset-btn  { background: #636e72; color: white; }
 
-#reset-btn { background: #636e72; color: white; }
-#reset-btn:active { background: #74828a; transform: scale(0.95); }
+#upload-btn:active { opacity: 0.8; transform: scale(0.95); }
+#rename-btn:active { opacity: 0.8; transform: scale(0.95); }
+#reset-btn:active  { opacity: 0.8; transform: scale(0.95); }
 
 #theme-toggle-btn {
   background: rgba(255,255,255,0.12);
   color: white;
   border: 1px solid rgba(255,255,255,0.2) !important;
   margin-left: auto;
+  align-items: center;
+  gap: 4px;
 }
-#theme-toggle-btn:active { background: rgba(255,255,255,0.22); transform: scale(0.95); }
+#theme-toggle-btn:active { opacity: 0.8; transform: scale(0.95); }
 #theme-toggle-btn.open {
   background: rgba(255,182,193,0.3);
   border-color: #ffb6c1 !important;
@@ -222,14 +237,13 @@ button {
   padding: 6px 12px;
   font-size: 0.8rem;
 }
-.theme-btn:active { background: rgba(255,255,255,0.25); transform: scale(0.95); }
+.theme-btn:active { opacity: 0.8; transform: scale(0.95); }
 .theme-btn.active {
   background: rgba(255,182,193,0.4);
   border-color: #ffb6c1 !important;
   box-shadow: 0 0 10px rgba(255,182,193,0.5);
 }
 
-/* Desktop hover states */
 @media (hover: hover) {
   #upload-btn:hover  { background: #7d6ff0; transform: translateY(-2px); }
   #rename-btn:hover  { background: #00cba9; transform: translateY(-2px); }
@@ -242,12 +256,13 @@ button {
 .modal {
   position: absolute;
   inset: 0;
-  background: rgba(0,0,0,0.7);
+  background: rgba(0,0,0,0.75);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 50;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   padding: 16px;
 }
 .modal-content {
@@ -262,39 +277,36 @@ button {
 .modal-content h3 { margin-bottom: 16px; font-size: 1.2rem; color: #a78bfa; }
 .modal-content input {
   width: 100%;
-  padding: 10px 14px;
+  padding: 12px 14px;
   border-radius: 8px;
   border: 1px solid rgba(255,255,255,0.2);
   background: rgba(255,255,255,0.05);
   color: white;
-  font-size: 1rem;
+  /* min 16px prevents iOS auto-zoom on focus */
+  font-size: max(16px, 1rem);
   outline: none;
   margin-bottom: 16px;
-  /* Prevent zoom on iOS when focusing input */
-  font-size: max(16px, 1rem);
 }
 .modal-content input:focus {
   border-color: #a78bfa;
   box-shadow: 0 0 8px rgba(167,139,250,0.3);
 }
-.modal-buttons { display: flex; gap: 10px; justify-content: center; }
-#rename-confirm { background: #00b894; color: white; padding: 10px 24px; flex: 1; }
-#rename-cancel  { background: #636e72; color: white; padding: 10px 24px; flex: 1; }
+.modal-buttons { display: flex; gap: 10px; }
+#rename-confirm { background: #00b894; color: white; padding: 12px; flex: 1; }
+#rename-cancel  { background: #636e72; color: white; padding: 12px; flex: 1; }
 
-/* ── Responsive breakpoints ──────────────────────────────────────────────── */
-
-/* Small phones — hide XP label text, shrink bar */
+/* ── Responsive HUD ──────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
   #xp-label-wrap { display: none; }
-  #xp-bar-wrap   { width: 70px; }
-  #level-display { font-size: 0.9rem; }
+  #xp-bar-wrap   { width: 80px; }
+  #level-display { font-size: 0.85rem; }
   #damage-display { font-size: 0.8rem; }
+  #hud { gap: 8px; padding: 5px 14px; }
 }
 
-/* Very small screens */
 @media (max-width: 360px) {
-  #xp-bar-wrap { display: none; }
-  #hud { gap: 8px; padding: 5px 12px; }
+  #xp-bar-wrap   { display: none; }
+  #hud { gap: 6px; padding: 5px 10px; }
 }
 
 /* ── Misc ────────────────────────────────────────────────────────────────── */

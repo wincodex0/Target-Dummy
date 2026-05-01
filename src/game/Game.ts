@@ -17,7 +17,10 @@ const DUMMY_FOOT_OFFSET = 78;
 /** Read the actual rendered height of the controls bar so mobile layout is accurate */
 function getControlsBarHeight(): number {
   const el = document.getElementById('controls');
-  return el ? el.offsetHeight : 56;
+  if (!el) return 56;
+  const h = el.offsetHeight;
+  // offsetHeight is 0 before first paint — use a safe minimum
+  return h > 0 ? h : 56;
 }
 
 export class Game {
@@ -108,7 +111,11 @@ export class Game {
   }
 
   private resize(): void {
-    this.canvas.width = window.innerWidth;
+    // Use CSS pixels for layout — canvas size matches the visual size exactly.
+    // We intentionally do NOT multiply by devicePixelRatio here because the
+    // game uses CSS pixel coordinates throughout (mouse, touch, physics).
+    // DPR scaling would require scaling every coordinate and every draw call.
+    this.canvas.width  = window.innerWidth;
     this.canvas.height = window.innerHeight;
   }
 
