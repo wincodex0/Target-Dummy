@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Target Dummy 🎯</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- HUD -->
+      <div id="hud">
+        <div id="level-display">🚀 Lv.<span id="level-value">1</span></div>
+        <div id="xp-bar-wrap">
+          <div id="xp-bar-fill"></div>
+        </div>
+        <div id="xp-label-wrap"><span id="xp-label">0 / 500 DMG</span></div>
+        <div id="damage-display">💥 <span id="damage-value">0</span></div>
+      </div>
+
+      <!-- Canvas -->
+      <canvas id="game-canvas"></canvas>
+
+      <!-- Floating damage numbers -->
+      <div id="damage-numbers"></div>
+
+      <!-- Level-up / Achievement Toast -->
+      <div id="achievement-toast" class="hidden">
+        <span id="achievement-text"></span>
+      </div>
+
+      <!-- Bottom Controls -->
+      <div id="controls">
+        <button id="upload-btn">📷 Upload Image</button>
+        <input type="file" id="image-upload" accept="image/*" style="display:none" />
+        <button id="rename-btn">✏️ Rename</button>
+        <button id="reset-btn">🔄 Reset</button>
+        <div id="theme-selector">
+          <span>🎨 Theme:</span>
+          <button class="theme-btn active" data-theme="sakura">🌸 Sakura</button>
+          <button class="theme-btn" data-theme="fire">🔥 Fire</button>
+          <button class="theme-btn" data-theme="ice">❄️ Ice</button>
+          <button class="theme-btn" data-theme="electric">⚡ Electric</button>
+          <button class="theme-btn" data-theme="galaxy">🌌 Galaxy</button>
+          <button class="theme-btn" data-theme="toxic">☠️ Toxic</button>
+        </div>
+      </div>
+
+      <!-- Rename Modal -->
+      <div id="rename-modal" class="modal hidden">
+        <div class="modal-content">
+          <h3>Rename Dummy</h3>
+          <input type="text" id="rename-input" maxlength="30" placeholder="Enter name (max 30 chars)" />
+          <div class="modal-buttons">
+            <button id="rename-confirm">✓ Confirm</button>
+            <button id="rename-cancel">✕ Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
