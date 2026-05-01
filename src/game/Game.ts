@@ -11,14 +11,14 @@ const { Engine, Runner, Bodies, Composite } = Matter;
 
 // Visual floor Y offset from bottom of canvas (matches drawFloor)
 const FLOOR_OFFSET = 60;
-// Controls bar height at the bottom of the screen
-const CONTROLS_BAR_HEIGHT = 56;
-// The dummy's "center" is at the hip level.
-// From hip center: feet are +78px down, head is -196px up (total height ~274px)
-// We want feet to sit ON the floor line, so:
-//   cy = floorY - DUMMY_FOOT_OFFSET
-//   floorY = canvas.height - CONTROLS_BAR_HEIGHT - FLOOR_OFFSET
+// Lowest body part offset from dummy center (lower legs at +78)
 const DUMMY_FOOT_OFFSET = 78;
+
+/** Read the actual rendered height of the controls bar so mobile layout is accurate */
+function getControlsBarHeight(): number {
+  const el = document.getElementById('controls');
+  return el ? el.offsetHeight : 56;
+}
 
 export class Game {
   private canvas: HTMLCanvasElement;
@@ -32,6 +32,11 @@ export class Game {
   private particles: ParticleSystem;
   private cannon!: Cannon;
   economy: Economy;
+
+  // World boundary bodies — stored so we can reposition on resize
+  private groundBody!: Matter.Body;
+  private wallLBody!: Matter.Body;
+  private wallRBody!: Matter.Body;
 
   private theme: ThemeName = 'sakura';
   private lastTime: number = 0;
@@ -81,19 +86,25 @@ export class Game {
 
     window.addEventListener('resize', () => {
       this.resize();
+      this.repositionWorld();
       this.setupCannon();
-      // Recalculate spawn so pedestal stays centered after resize
       const { cx, cy } = this.getDummySpawn();
       this.dummySpawnX = cx;
       this.dummySpawnY = cy;
     });
 
-    // Track mouse for cannon aiming
+    // Track mouse/touch position for cannon aiming — exposed via setMousePos
     this.canvas.addEventListener('mousemove', (e) => {
       const rect = this.canvas.getBoundingClientRect();
-      this.mouseX = e.clientX - rect.left;
-      this.mouseY = e.clientY - rect.top;
+      this.mouseX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+      this.mouseY = (e.clientY - rect.top)  * (this.canvas.height / rect.height);
     });
+  }
+
+  /** Called from main.ts for both mouse and touch aiming */
+  setMousePos(x: number, y: number): void {
+    this.mouseX = x;
+    this.mouseY = y;
   }
 
   private resize(): void {
@@ -104,44 +115,49 @@ export class Game {
   private setupWorld(): void {
     const w = this.canvas.width;
     const h = this.canvas.height;
-
-    // The visible play area ends above the controls bar
-    const playH = h - CONTROLS_BAR_HEIGHT;
+    const playH = h - getControlsBarHeight();
     const floorY = playH - FLOOR_OFFSET;
 
-    const ground = Bodies.rectangle(w / 2, floorY + 25, w * 3, 50, {
-      isStatic: true,
-      label: 'ground',
-      friction: 0.8,
+    this.groundBody = Bodies.rectangle(w / 2, floorY + 25, w * 3, 50, {
+      isStatic: true, label: 'ground', friction: 0.8,
       collisionFilter: { category: 0x0001, mask: 0x0002 },
     });
-    const wallL = Bodies.rectangle(-25, playH / 2, 50, playH * 3, {
+    this.wallLBody = Bodies.rectangle(-25, playH / 2, 50, playH * 3, {
       isStatic: true, label: 'wallL',
       collisionFilter: { category: 0x0001, mask: 0x0002 },
     });
-    const wallR = Bodies.rectangle(w + 25, playH / 2, 50, playH * 3, {
+    this.wallRBody = Bodies.rectangle(w + 25, playH / 2, 50, playH * 3, {
       isStatic: true, label: 'wallR',
       collisionFilter: { category: 0x0001, mask: 0x0002 },
     });
-    Composite.add(this.engine.world, [ground, wallL, wallR]);
+    Composite.add(this.engine.world, [this.groundBody, this.wallLBody, this.wallRBody]);
     Runner.run(this.runner, this.engine);
   }
 
+  private repositionWorld(): void {
+    const { Body } = Matter;
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    const playH = h - getControlsBarHeight();
+    const floorY = playH - FLOOR_OFFSET;
+
+    Body.setPosition(this.groundBody, { x: w / 2,  y: floorY + 25 });
+    Body.setPosition(this.wallLBody,  { x: -25,     y: playH / 2 });
+    Body.setPosition(this.wallRBody,  { x: w + 25,  y: playH / 2 });
+  }
+
   private getDummySpawn(): { cx: number; cy: number } {
-    // Dummy spawns on top of the pedestal (right of center, where the arrow points)
-    // Pedestal is at 60% across, 14px tall — dummy feet sit on top of it
-    const PEDESTAL_HEIGHT = 14;
-    const cx = this.canvas.width * 0.60;
-    const floorY = this.canvas.height - CONTROLS_BAR_HEIGHT - FLOOR_OFFSET;
-    // Feet land on top of pedestal, not the floor
-    const cy = floorY - PEDESTAL_HEIGHT - DUMMY_FOOT_OFFSET;
+    // Dummy stands center-screen on the floor — sandbox style
+    const cx = this.canvas.width / 2;
+    const floorY = this.canvas.height - getControlsBarHeight() - FLOOR_OFFSET;
+    const cy = floorY - DUMMY_FOOT_OFFSET;
     return { cx, cy };
   }
 
   private setupCannon(): void {
-    // Cannon sits left of center — clear lane to shoot at dummy on the right
-    const cx = this.canvas.width * 0.35;
-    const floorY = this.canvas.height - CONTROLS_BAR_HEIGHT - FLOOR_OFFSET;
+    // Cannon sits bottom-left
+    const cx = this.canvas.width * 0.18;
+    const floorY = this.canvas.height - getControlsBarHeight() - FLOOR_OFFSET;
     const cy = floorY;
     if (this.cannon) {
       this.cannon.x = cx;
@@ -242,6 +258,8 @@ export class Game {
     this.particles.update(dt);
 
     // Update dummy — pure physics, no snap-back
+    const floorY = this.canvas.height - getControlsBarHeight() - FLOOR_OFFSET;
+    this.dummy.floorY = floorY;
     this.dummy.update(dt);
 
     // Shake timer
@@ -364,7 +382,7 @@ export class Game {
   }
 
   private drawFloor(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-    const playH = h - CONTROLS_BAR_HEIGHT;
+    const playH = h - getControlsBarHeight();
     const floorY = playH - FLOOR_OFFSET;
 
     // Floor surface
@@ -405,38 +423,14 @@ export class Game {
 
   private drawPedestal(ctx: CanvasRenderingContext2D): void {
     const cx = this.dummySpawnX;
-    const floorY = this.canvas.height - CONTROLS_BAR_HEIGHT - FLOOR_OFFSET;
+    const floorY = this.canvas.height - getControlsBarHeight() - FLOOR_OFFSET;
 
-    const pw = 90;
-    const ph = 14;
-    const px = cx - pw / 2;
-    const py = floorY - ph;
-
+    // Just a soft glow shadow on the floor under the dummy
     ctx.save();
-
-    // Drop shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillStyle = 'rgba(150, 100, 255, 0.12)';
     ctx.beginPath();
-    ctx.ellipse(cx, floorY + 4, pw / 2, 8, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, floorY, 55, 8, 0, 0, Math.PI * 2);
     ctx.fill();
-
-    // Platform block
-    const grad = ctx.createLinearGradient(px, py, px, py + ph);
-    grad.addColorStop(0, '#5a3e8a');
-    grad.addColorStop(1, '#2d1f4a');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.roundRect(px, py, pw, ph, [4, 4, 0, 0]);
-    ctx.fill();
-
-    // Top edge highlight
-    ctx.strokeStyle = 'rgba(180, 140, 255, 0.5)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(px + 4, py + 2);
-    ctx.lineTo(px + pw - 4, py + 2);
-    ctx.stroke();
-
     ctx.restore();
   }
 

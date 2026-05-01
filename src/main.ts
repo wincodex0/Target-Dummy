@@ -10,28 +10,80 @@ const hud  = new HUD();
 game.onLevelUpdate = (level, progress, nextThreshold, totalDamage) => {
   hud.updateLevel(level, progress, nextThreshold, totalDamage);
 };
-
 game.onDamageNumber = (x, y, amount, isCrit) => {
   hud.spawnDamageNumber(x, y, amount, isCrit);
   hud.addDamage(amount);
 };
+game.onLevelUp = (level) => hud.showLevelUp(level);
 
-game.onLevelUp = (level) => {
-  hud.showLevelUp(level);
-};
-
-// ── Canvas click → fire ───────────────────────────────────────────────────────
-canvas.addEventListener('click', (e) => {
+// ── Helper: canvas-relative coords ───────────────────────────────────────────
+function canvasCoords(clientX: number, clientY: number) {
   const rect = canvas.getBoundingClientRect();
-  game.fireFromCannon(e.clientX - rect.left, e.clientY - rect.top);
+  return {
+    x: (clientX - rect.left) * (canvas.width  / rect.width),
+    y: (clientY - rect.top)  * (canvas.height / rect.height),
+  };
+}
+
+// ── Mouse: aim + click to fire ────────────────────────────────────────────────
+canvas.addEventListener('mousemove', (e) => {
+  const { x, y } = canvasCoords(e.clientX, e.clientY);
+  game.setMousePos(x, y);
 });
 
-// ── Theme buttons ─────────────────────────────────────────────────────────────
+canvas.addEventListener('click', (e) => {
+  const { x, y } = canvasCoords(e.clientX, e.clientY);
+  game.fireFromCannon(x, y);
+});
+
+// ── Touch: aim on move, fire on tap ──────────────────────────────────────────
+let touchFired = false;
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  touchFired = false;
+  const t = e.touches[0];
+  const { x, y } = canvasCoords(t.clientX, t.clientY);
+  game.setMousePos(x, y);
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  const t = e.touches[0];
+  const { x, y } = canvasCoords(t.clientX, t.clientY);
+  game.setMousePos(x, y);
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  if (!touchFired) {
+    touchFired = true;
+    const t = e.changedTouches[0];
+    const { x, y } = canvasCoords(t.clientX, t.clientY);
+    game.fireFromCannon(x, y);
+  }
+}, { passive: false });
+
+// ── Theme toggle (collapsible on mobile) ──────────────────────────────────────
+const themeToggleBtn  = document.getElementById('theme-toggle-btn')!;
+const themeSelector   = document.getElementById('theme-selector')!;
+
+themeToggleBtn.addEventListener('click', () => {
+  const isOpen = !themeSelector.classList.contains('hidden');
+  themeSelector.classList.toggle('hidden', isOpen);
+  themeToggleBtn.classList.toggle('open', !isOpen);
+});
+
 document.querySelectorAll('.theme-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     game.setTheme((btn as HTMLElement).dataset.theme as ThemeName);
+    // Close theme panel on mobile after selection
+    if (window.innerWidth < 640) {
+      themeSelector.classList.add('hidden');
+      themeToggleBtn.classList.remove('open');
+    }
   });
 });
 

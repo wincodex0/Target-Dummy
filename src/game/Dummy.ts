@@ -8,7 +8,6 @@ interface BodyPart {
   label: string;
 }
 
-// Rest positions relative to spawn center (cx, cy) — used only for initial placement
 const REST_OFFSETS: Record<string, { x: number; y: number }> = {
   head:      { x:   0, y: -160 },
   torso:     { x:   0, y:  -80 },
@@ -23,26 +22,11 @@ const REST_OFFSETS: Record<string, { x: number; y: number }> = {
 };
 
 const HIT_LINES = [
-  'Ow!!',
-  'That hurt!',
-  'Stop it!!',
-  'Why meee?!',
-  'OUCH!',
-  'Not the face!',
-  'I give up...',
-  'Please stop!',
-  'My bones!!',
-  'AHHHHH!!',
-  'This is fine 🔥',
-  'I felt that...',
-  'Mommy!!',
-  'Bruh.',
-  '...ow.',
-  'YEET',
-  'I am okay 👍',
-  'Do it again!',
-  'That tickled.',
-  'SEND HELP',
+  'Ow!!', 'That hurt!', 'Stop it!!', 'Why meee?!', 'OUCH!',
+  'Not the face!', 'I give up...', 'Please stop!', 'My bones!!',
+  'AHHHHH!!', 'This is fine 🔥', 'I felt that...', 'Mommy!!',
+  'Bruh.', '...ow.', 'YEET', 'I am okay 👍', 'Do it again!',
+  'That tickled.', 'SEND HELP',
 ];
 
 export class Dummy {
@@ -52,19 +36,41 @@ export class Dummy {
   config: DummyConfig;
   private faceImage: HTMLImageElement | null = null;
 
-  // Dialogue state
+  // Spawn reference — all stand-up lerps return here
+  private spawnCx: number = 0;
+  private spawnCy: number = 0;
+  // Floor Y — set by Game so we can clamp stand position
+  floorY: number = 9999;
+
+  // State machine
+  // 'idle'     — frozen upright, waiting for first hit
+  // 'ragdoll'  — physics running freely after a hit
+  // 'standup'  — lerping back to upright
+  private state: 'idle' | 'ragdoll' | 'standup' = 'idle';
+  private hitTimer: number = 0;       // ragdoll hold duration countdown
+  private standProgress: number = 0;  // 0→1 during stand-up
+  private standFrom: Record<string, { x: number; y: number; angle: number }> = {};
+
+  private readonly STAND_SPEED   = 0.2;  // exactly 5 seconds to stand up
+
+  // Dialogue
   private dialogueText: string = '';
   private dialogueVisible: boolean = false;
-  private dialogueCooldown: number = 0;   // counts up to 10s between shows
-  private dialogueTimer: number = 0;       // counts down 3s while visible
+  private dialogueCooldown: number = 0;
+  private dialogueTimer: number = 0;
   private lastLineIndex: number = -1;
-  private readonly DIALOGUE_INTERVAL = 10; // seconds between dialogues
-  private readonly DIALOGUE_DURATION = 3;  // seconds visible
+  private readonly DIALOGUE_INTERVAL = 10;
+  private readonly DIALOGUE_DURATION = 3;
 
   constructor(cx: number, cy: number, config: DummyConfig) {
     this.config = config;
+    this.spawnCx = cx;
+    this.spawnCy = cy;
     this.composite = Composite.create();
     this.build(cx, cy);
+    // Start frozen upright — parts are static so gravity can't pull them
+    this.snapToRest();
+    this.setStatic(true);
   }
 
   private build(cx: number, cy: number): void {
@@ -85,10 +91,7 @@ export class Dummy {
       restitution: 0.3,
       friction: 0.4,
       density: 0.003,
-      collisionFilter: {
-        category: dummyCategory,
-        mask: worldCategory,
-      },
+      collisionFilter: { category: dummyCategory, mask: worldCategory },
       ...extra,
     });
 
@@ -119,21 +122,48 @@ export class Dummy {
     ) => Constraint.create({ bodyA: a, bodyB: b, pointA: ax, pointB: bx, stiffness, length: 0 });
 
     this.constraints = [
-      joint(head, torso,          { x: 0, y: headR },             { x: 0, y: -torsoH / 2 },    0.5),
-      joint(torso, upperArmL,     { x: -torsoW/2, y: -torsoH/4 }, { x: 0, y: -upperArmH/2 },   0.4),
-      joint(torso, upperArmR,     { x:  torsoW/2, y: -torsoH/4 }, { x: 0, y: -upperArmH/2 },   0.4),
-      joint(upperArmL, lowerArmL, { x: 0, y: upperArmH/2 },       { x: 0, y: -lowerArmH/2 },   0.4),
-      joint(upperArmR, lowerArmR, { x: 0, y: upperArmH/2 },       { x: 0, y: -lowerArmH/2 },   0.4),
-      joint(torso, upperLegL,     { x: -torsoW/4, y: torsoH/2 },  { x: 0, y: -upperLegH/2 },   0.4),
-      joint(torso, upperLegR,     { x:  torsoW/4, y: torsoH/2 },  { x: 0, y: -upperLegH/2 },   0.4),
-      joint(upperLegL, lowerLegL, { x: 0, y: upperLegH/2 },       { x: 0, y: -lowerLegH/2 },   0.4),
-      joint(upperLegR, lowerLegR, { x: 0, y: upperLegH/2 },       { x: 0, y: -lowerLegH/2 },   0.4),
+      joint(head, torso,          { x: 0, y: headR },             { x: 0, y: -torsoH / 2 },  0.5),
+      joint(torso, upperArmL,     { x: -torsoW/2, y: -torsoH/4 }, { x: 0, y: -upperArmH/2 }, 0.4),
+      joint(torso, upperArmR,     { x:  torsoW/2, y: -torsoH/4 }, { x: 0, y: -upperArmH/2 }, 0.4),
+      joint(upperArmL, lowerArmL, { x: 0, y: upperArmH/2 },       { x: 0, y: -lowerArmH/2 }, 0.4),
+      joint(upperArmR, lowerArmR, { x: 0, y: upperArmH/2 },       { x: 0, y: -lowerArmH/2 }, 0.4),
+      joint(torso, upperLegL,     { x: -torsoW/4, y: torsoH/2 },  { x: 0, y: -upperLegH/2 }, 0.4),
+      joint(torso, upperLegR,     { x:  torsoW/4, y: torsoH/2 },  { x: 0, y: -upperLegH/2 }, 0.4),
+      joint(upperLegL, lowerLegL, { x: 0, y: upperLegH/2 },       { x: 0, y: -lowerLegH/2 }, 0.4),
+      joint(upperLegR, lowerLegR, { x: 0, y: upperLegH/2 },       { x: 0, y: -lowerLegH/2 }, 0.4),
     ];
 
     Composite.add(this.composite, [...allBodies, ...this.constraints]);
   }
 
+  /** Instantly place every part at its rest position with zero velocity */
+  private snapToRest(): void {
+    for (const { body, label } of this.parts) {
+      const off = REST_OFFSETS[label];
+      if (!off) continue;
+      Body.setPosition(body, { x: this.spawnCx + off.x, y: this.spawnCy + off.y });
+      Body.setAngle(body, 0);
+      Body.setVelocity(body, { x: 0, y: 0 });
+      Body.setAngularVelocity(body, 0);
+    }
+  }
+
+  /** Make all parts static so physics can't move them */
+  private setStatic(isStatic: boolean): void {
+    for (const { body } of this.parts) {
+      Body.setStatic(body, isStatic);
+    }
+  }
+
   applyExplosionForce(x: number, y: number, radius: number, force: number): void {
+    // Go dynamic so physics can move the parts
+    this.setStatic(false);
+
+    // Transition to ragdoll — wait 5–10 seconds before standing up
+    this.state = 'ragdoll';
+    this.hitTimer = 5 + Math.random() * 5; // 5–10s
+    this.standProgress = 0;
+
     for (const { body } of this.parts) {
       const dx = body.position.x - x;
       const dy = body.position.y - y;
@@ -144,25 +174,22 @@ export class Dummy {
       const nx = dx / (dist || 1);
       const ny = dy / (dist || 1);
 
-      // Strong outward blast + upward kick
-      const fx = nx * force * falloff;
-      const fy = ny * force * falloff - force * falloff * 0.8;
-
-      Body.applyForce(body, body.position, Vector.create(fx, fy));
-
-      // Spin limbs on impact
+      Body.applyForce(body, body.position, Vector.create(
+        nx * force * falloff,
+        ny * force * falloff - force * falloff * 0.8
+      ));
       Body.setAngularVelocity(body, body.angularVelocity + (Math.random() - 0.5) * force * 8);
     }
   }
 
   getHeadPosition(): { x: number; y: number } {
-    const head = this.parts.find(p => p.label === 'head');
-    return head ? { x: head.body.position.x, y: head.body.position.y } : { x: 0, y: 0 };
+    const h = this.parts.find(p => p.label === 'head');
+    return h ? { x: h.body.position.x, y: h.body.position.y } : { x: 0, y: 0 };
   }
 
   getTorsoPosition(): { x: number; y: number } {
-    const torso = this.parts.find(p => p.label === 'torso');
-    return torso ? { x: torso.body.position.x, y: torso.body.position.y } : { x: 0, y: 0 };
+    const t = this.parts.find(p => p.label === 'torso');
+    return t ? { x: t.body.position.x, y: t.body.position.y } : { x: 0, y: 0 };
   }
 
   setFaceImage(dataUrl: string): void {
@@ -171,31 +198,95 @@ export class Dummy {
     img.src = dataUrl;
   }
 
-  // Pure physics — no snap-back, no recovery. Dummy stays wherever it lands.
   update(dt: number): void {
-    // Tick dialogue cooldown
+    // ── Dialogue tick ──────────────────────────────────────────────────────
     if (this.dialogueVisible) {
       this.dialogueTimer -= dt;
       if (this.dialogueTimer <= 0) {
         this.dialogueVisible = false;
-        this.dialogueCooldown = 0; // reset cooldown after it disappears
+        this.dialogueCooldown = 0;
       }
     } else {
       this.dialogueCooldown += dt;
     }
+
+    // ── State machine ──────────────────────────────────────────────────────
+    if (this.state === 'idle') {
+      // Static — Matter.js holds parts in place, no tunneling possible
+      return;
+    }
+
+    if (this.state === 'ragdoll') {
+      this.hitTimer -= dt;
+      if (this.hitTimer <= 0) {
+        // Derive new stand center from torso's current position, clamped to floor
+        const torso = this.parts.find(p => p.label === 'torso');
+        if (torso) {
+          this.spawnCx = torso.body.position.x;
+          this.spawnCy = Math.min(torso.body.position.y + 80, this.floorY - 78);
+        }
+
+        // Snapshot the current angle of every part — we'll lerp these back to 0
+        // Positions are snapped to rest immediately so parts are always visible,
+        // but angles animate slowly back to upright
+        this.standFrom = {};
+        for (const { body, label } of this.parts) {
+          this.standFrom[label] = {
+            x: body.position.x,   // not used during standup, just stored
+            y: body.position.y,
+            angle: body.angle,
+          };
+        }
+
+        // Snap positions to rest right now — no travel, no disappearing
+        this.snapToRest();
+        this.setStatic(true);
+
+        this.standProgress = 0;
+        this.state = 'standup';
+      }
+      return;
+    }
+
+    if (this.state === 'standup') {
+      this.standProgress = Math.min(1, this.standProgress + dt * this.STAND_SPEED);
+      // Ease-in-out — slow start (dazed), picks up, settles gently upright
+      const t = this.standProgress < 0.5
+        ? 2 * this.standProgress * this.standProgress
+        : 1 - Math.pow(-2 * this.standProgress + 2, 2) / 2;
+
+      // Rise from floor: every part starts at floorY and slides up to rest position.
+      // Angles stay at 0 the whole time — clean upright rise, no spinning.
+      for (const { body, label } of this.parts) {
+        const off = REST_OFFSETS[label];
+        if (!off) continue;
+
+        const restX = this.spawnCx + off.x;
+        const restY = this.spawnCy + off.y;
+        const startY = this.floorY; // collapsed at floor level
+
+        Body.setPosition(body, {
+          x: restX,
+          y: startY + (restY - startY) * t,
+        });
+        Body.setAngle(body, 0);
+        Body.setVelocity(body, { x: 0, y: 0 });
+        Body.setAngularVelocity(body, 0);
+      }
+
+      if (this.standProgress >= 1) {
+        this.snapToRest();
+        this.state = 'idle';
+      }
+    }
   }
 
-  /** Called by Game on every explosion hit */
   triggerDialogue(): void {
-    // Only show if cooldown has elapsed
     if (this.dialogueCooldown < this.DIALOGUE_INTERVAL) return;
-
-    // Pick a random line, avoid repeating the last one
     let idx: number;
     do { idx = Math.floor(Math.random() * HIT_LINES.length); }
     while (idx === this.lastLineIndex && HIT_LINES.length > 1);
     this.lastLineIndex = idx;
-
     this.dialogueText = HIT_LINES[idx];
     this.dialogueVisible = true;
     this.dialogueTimer = this.DIALOGUE_DURATION;
@@ -226,7 +317,6 @@ export class Dummy {
         const r = Math.sqrt(
           (verts[0].x - body.position.x) ** 2 + (verts[0].y - body.position.y) ** 2
         );
-
         ctx.shadowColor = 'rgba(0,0,0,0.4)';
         ctx.shadowBlur = 8;
         ctx.shadowOffsetY = 4;
@@ -270,7 +360,6 @@ export class Dummy {
         ctx.shadowColor = 'rgba(0,0,0,0.35)';
         ctx.shadowBlur = 6;
         ctx.shadowOffsetY = 3;
-
         ctx.beginPath();
         ctx.moveTo(verts[0].x - body.position.x, verts[0].y - body.position.y);
         for (let i = 1; i < verts.length; i++) {
@@ -299,11 +388,10 @@ export class Dummy {
           ctx.stroke();
         }
       }
-
       ctx.restore();
     }
 
-    // Name label — follows the head wherever it goes
+    // Name label + speech bubble — follow the head
     const headPart = this.parts.find(p => p.label === 'head');
     if (headPart) {
       const hx = headPart.body.position.x;
@@ -326,7 +414,6 @@ export class Dummy {
       ctx.fillText(this.config.name, hx, pillY + 16);
       ctx.restore();
 
-      // Speech bubble — shown for DIALOGUE_DURATION seconds every DIALOGUE_INTERVAL seconds
       if (this.dialogueVisible && this.dialogueText) {
         const fadeIn  = Math.min(1, (this.DIALOGUE_DURATION - this.dialogueTimer) / 0.2);
         const fadeOut = Math.min(1, this.dialogueTimer / 0.4);
@@ -340,45 +427,33 @@ export class Dummy {
         const bw = ctx.measureText(this.dialogueText).width + 28;
         const bh = 36;
         const bx = hx - bw / 2;
-        const by = pillY - bh - 18; // above the name pill
-        const br = 10;
+        const by = pillY - bh - 18;
         const tailX = hx;
         const tailY = by + bh;
 
-        // Bubble shadow
         ctx.shadowColor = 'rgba(0,0,0,0.4)';
         ctx.shadowBlur = 10;
         ctx.shadowOffsetY = 3;
-
-        // Bubble background
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.roundRect(bx, by, bw, bh, br);
+        ctx.roundRect(bx, by, bw, bh, 10);
         ctx.fill();
-
-        // Tail (triangle pointing down toward head)
         ctx.beginPath();
         ctx.moveTo(tailX - 8, tailY);
         ctx.lineTo(tailX + 8, tailY);
         ctx.lineTo(tailX, tailY + 12);
         ctx.closePath();
         ctx.fill();
-
         ctx.shadowBlur = 0;
         ctx.shadowOffsetY = 0;
-
-        // Bubble border
         ctx.strokeStyle = 'rgba(0,0,0,0.12)';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.roundRect(bx, by, bw, bh, br);
+        ctx.roundRect(bx, by, bw, bh, 10);
         ctx.stroke();
-
-        // Text
         ctx.fillStyle = '#1a1a2e';
         ctx.font = 'bold 15px Segoe UI, sans-serif';
         ctx.fillText(this.dialogueText, hx, by + bh / 2 + 5);
-
         ctx.restore();
       }
     }

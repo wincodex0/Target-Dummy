@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Target Dummy 🎯</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -31,12 +34,14 @@
 
       <!-- Bottom Controls -->
       <div id="controls">
-        <button id="upload-btn">📷 Upload Image</button>
-        <input type="file" id="image-upload" accept="image/*" style="display:none" />
-        <button id="rename-btn">✏️ Rename</button>
-        <button id="reset-btn">🔄 Reset</button>
-        <div id="theme-selector">
-          <span>🎨 Theme:</span>
+        <div id="controls-row1">
+          <button id="upload-btn">📷</button>
+          <input type="file" id="image-upload" accept="image/*" style="display:none" />
+          <button id="rename-btn">✏️ Rename</button>
+          <button id="reset-btn">🔄 Reset</button>
+          <button id="theme-toggle-btn">🎨 Theme</button>
+        </div>
+        <div id="theme-selector" class="hidden">
           <button class="theme-btn active" data-theme="sakura">🌸 Sakura</button>
           <button class="theme-btn" data-theme="fire">🔥 Fire</button>
           <button class="theme-btn" data-theme="ice">❄️ Ice</button>

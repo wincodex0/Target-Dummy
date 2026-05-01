@@ -6,67 +6,72 @@ body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   overflow: hidden;
   user-select: none;
+  -webkit-user-select: none;
+  touch-action: none; /* prevent scroll/zoom on touch */
+  -webkit-tap-highlight-color: transparent;
 }
 
 #app {
   width: 100vw;
   height: 100vh;
+  height: 100dvh; /* dynamic viewport height — accounts for mobile browser chrome */
   position: relative;
 }
 
 /* ── HUD ─────────────────────────────────────────────────────────────────── */
 #hud {
   position: absolute;
-  top: 12px;
+  top: 10px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   z-index: 10;
   background: rgba(0,0,0,0.6);
-  padding: 8px 20px;
+  padding: 6px 16px;
   border-radius: 30px;
   border: 1px solid rgba(255,255,255,0.1);
   backdrop-filter: blur(8px);
   white-space: nowrap;
+  max-width: calc(100vw - 24px);
 }
 
 #level-display {
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: bold;
   color: #a78bfa;
   text-shadow: 0 0 10px rgba(167,139,250,0.7);
-  min-width: 60px;
 }
 
 #xp-bar-wrap {
-  width: 160px;
-  height: 10px;
+  width: 100px;
+  height: 8px;
   background: rgba(255,255,255,0.1);
-  border-radius: 5px;
+  border-radius: 4px;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,0.15);
+  flex-shrink: 0;
 }
 
 #xp-bar-fill {
   height: 100%;
   width: 0%;
   background: linear-gradient(90deg, #7c3aed, #a78bfa);
-  border-radius: 5px;
+  border-radius: 4px;
   transition: width 0.4s ease;
   box-shadow: 0 0 6px rgba(167,139,250,0.6);
 }
 
 #xp-label-wrap {
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   color: #aaa;
-  min-width: 130px;
+  min-width: 90px;
   text-align: center;
 }
 
 #damage-display {
-  font-size: 1rem;
+  font-size: 0.9rem;
   color: #ff4757;
   font-weight: 600;
 }
@@ -77,6 +82,12 @@ body {
   top: 0; left: 0;
   width: 100%; height: 100%;
   cursor: none;
+  touch-action: none;
+}
+
+/* On touch devices show default cursor (no mouse cursor to hide) */
+@media (hover: none) {
+  #game-canvas { cursor: default; }
 }
 
 /* ── Damage numbers ──────────────────────────────────────────────────────── */
@@ -91,12 +102,12 @@ body {
 .damage-number {
   position: absolute;
   font-weight: bold;
-  font-size: 1.4rem;
+  font-size: 1.2rem;
   pointer-events: none;
   text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
   animation: floatUp 1.2s ease-out forwards;
 }
-.damage-number.critical { font-size: 2rem; color: #ffd700; }
+.damage-number.critical { font-size: 1.6rem; color: #ffd700; }
 .damage-number.normal   { color: #ff6b6b; }
 
 @keyframes floatUp {
@@ -108,18 +119,21 @@ body {
 /* ── Level-up toast ──────────────────────────────────────────────────────── */
 #achievement-toast {
   position: absolute;
-  top: 70px;
+  top: 60px;
   left: 50%;
   transform: translateX(-50%);
   background: linear-gradient(135deg, #7c3aed, #a78bfa);
   color: #fff;
   font-weight: bold;
-  padding: 10px 24px;
+  padding: 8px 20px;
   border-radius: 30px;
-  font-size: 1rem;
+  font-size: 0.9rem;
   z-index: 30;
   box-shadow: 0 4px 20px rgba(124,58,237,0.5);
   animation: toastIn 0.4s ease-out;
+  white-space: nowrap;
+  max-width: calc(100vw - 32px);
+  text-align: center;
 }
 @keyframes toastIn {
   from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
@@ -130,43 +144,76 @@ body {
 #controls {
   position: absolute;
   bottom: 0; left: 0; right: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 20px;
-  background: rgba(0,0,0,0.75);
+  background: rgba(0,0,0,0.82);
   border-top: 1px solid rgba(255,255,255,0.1);
   backdrop-filter: blur(8px);
-  flex-wrap: wrap;
   z-index: 10;
+  padding: 0;
 }
 
-button {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 600;
-  transition: all 0.2s ease;
+#controls-row1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
-
-#upload-btn { background: #6c5ce7; color: white; }
-#upload-btn:hover { background: #7d6ff0; transform: translateY(-2px); }
-
-#rename-btn { background: #00b894; color: white; }
-#rename-btn:hover { background: #00cba9; transform: translateY(-2px); }
-
-#reset-btn { background: #636e72; color: white; }
-#reset-btn:hover { background: #74828a; transform: translateY(-2px); }
+#controls-row1::-webkit-scrollbar { display: none; }
 
 #theme-selector {
   display: flex;
   align-items: center;
   gap: 6px;
+  padding: 6px 12px 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+#theme-selector::-webkit-scrollbar { display: none; }
+
+button {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  /* Larger tap targets on mobile */
+  min-height: 36px;
+}
+
+#upload-btn {
+  background: #6c5ce7;
+  color: white;
+  padding: 8px 12px;
+  font-size: 1rem;
+}
+#upload-btn:active { background: #7d6ff0; transform: scale(0.95); }
+
+#rename-btn { background: #00b894; color: white; }
+#rename-btn:active { background: #00cba9; transform: scale(0.95); }
+
+#reset-btn { background: #636e72; color: white; }
+#reset-btn:active { background: #74828a; transform: scale(0.95); }
+
+#theme-toggle-btn {
+  background: rgba(255,255,255,0.12);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.2) !important;
   margin-left: auto;
 }
-#theme-selector span { font-size: 0.85rem; color: #aaa; }
+#theme-toggle-btn:active { background: rgba(255,255,255,0.22); transform: scale(0.95); }
+#theme-toggle-btn.open {
+  background: rgba(255,182,193,0.3);
+  border-color: #ffb6c1 !important;
+}
 
 .theme-btn {
   background: rgba(255,255,255,0.1);
@@ -175,11 +222,20 @@ button {
   padding: 6px 12px;
   font-size: 0.8rem;
 }
-.theme-btn:hover { background: rgba(255,255,255,0.2); transform: translateY(-2px); }
+.theme-btn:active { background: rgba(255,255,255,0.25); transform: scale(0.95); }
 .theme-btn.active {
   background: rgba(255,182,193,0.4);
   border-color: #ffb6c1 !important;
   box-shadow: 0 0 10px rgba(255,182,193,0.5);
+}
+
+/* Desktop hover states */
+@media (hover: hover) {
+  #upload-btn:hover  { background: #7d6ff0; transform: translateY(-2px); }
+  #rename-btn:hover  { background: #00cba9; transform: translateY(-2px); }
+  #reset-btn:hover   { background: #74828a; transform: translateY(-2px); }
+  .theme-btn:hover   { background: rgba(255,255,255,0.2); transform: translateY(-2px); }
+  #theme-toggle-btn:hover { background: rgba(255,255,255,0.2); }
 }
 
 /* ── Modal ───────────────────────────────────────────────────────────────── */
@@ -192,16 +248,18 @@ button {
   justify-content: center;
   z-index: 50;
   backdrop-filter: blur(4px);
+  padding: 16px;
 }
 .modal-content {
   background: #1a1a2e;
   border: 1px solid rgba(255,255,255,0.2);
   border-radius: 16px;
-  padding: 28px;
-  min-width: 320px;
+  padding: 24px;
+  width: 100%;
+  max-width: 360px;
   text-align: center;
 }
-.modal-content h3 { margin-bottom: 16px; font-size: 1.3rem; color: #a78bfa; }
+.modal-content h3 { margin-bottom: 16px; font-size: 1.2rem; color: #a78bfa; }
 .modal-content input {
   width: 100%;
   padding: 10px 14px;
@@ -212,19 +270,35 @@ button {
   font-size: 1rem;
   outline: none;
   margin-bottom: 16px;
+  /* Prevent zoom on iOS when focusing input */
+  font-size: max(16px, 1rem);
 }
 .modal-content input:focus {
   border-color: #a78bfa;
   box-shadow: 0 0 8px rgba(167,139,250,0.3);
 }
 .modal-buttons { display: flex; gap: 10px; justify-content: center; }
-#rename-confirm { background: #00b894; color: white; padding: 8px 24px; }
-#rename-confirm:hover { background: #00cba9; }
-#rename-cancel { background: #636e72; color: white; padding: 8px 24px; }
-#rename-cancel:hover { background: #74828a; }
+#rename-confirm { background: #00b894; color: white; padding: 10px 24px; flex: 1; }
+#rename-cancel  { background: #636e72; color: white; padding: 10px 24px; flex: 1; }
+
+/* ── Responsive breakpoints ──────────────────────────────────────────────── */
+
+/* Small phones — hide XP label text, shrink bar */
+@media (max-width: 480px) {
+  #xp-label-wrap { display: none; }
+  #xp-bar-wrap   { width: 70px; }
+  #level-display { font-size: 0.9rem; }
+  #damage-display { font-size: 0.8rem; }
+}
+
+/* Very small screens */
+@media (max-width: 360px) {
+  #xp-bar-wrap { display: none; }
+  #hud { gap: 8px; padding: 5px 12px; }
+}
 
 /* ── Misc ────────────────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
 .hidden { display: none !important; }
